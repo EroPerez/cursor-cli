@@ -47,13 +47,21 @@ bun run build
 
 ## Setup
 
-Export your Cursor API key:
+### Web login (recommended)
+
+```bash
+cursor-cli login
+```
+
+Opens `cursor.com/settings` in your browser, prompts you to paste your API key, and saves it to `~/.cursor-cli/config.json`.
+
+### Manual setup
 
 ```bash
 export CURSOR_API_KEY="crsr_..."
 ```
 
-Or save it to the config file:
+Or save it directly to the config file:
 
 ```bash
 bun run dev /config apiKey crsr_...
@@ -64,8 +72,11 @@ bun run dev /config apiKey crsr_...
 ### Quick Start
 
 ```bash
+# Authenticate first (one-time)
+cursor-cli login
+
 # Interactive TUI (current directory)
-./cursor-cli .
+cursor-cli .
 
 # One-shot prompt (current directory)
 ./cursor-cli "Explain the auth flow"
@@ -299,6 +310,7 @@ src/
 ├── agent.ts          # CodingAgentSession — wraps @cursor/sdk
 ├── banner.ts         # ASCII art banner for interactive mode
 ├── commands.ts       # Slash command registry and parsing
+├── login.ts          # Web login flow (browser + API key prompt)
 ├── config.ts         # Persistent configuration (~/.cursor-cli/config.json)
 ├── history.ts        # Session storage, resume, markdown export
 ├── search.ts         # DuckDuckGo web search integration
