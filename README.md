@@ -72,6 +72,9 @@ bun run dev /config apiKey crsr_...
 ### Quick Start
 
 ```bash
+# Test without API key (demo mode)
+cursor-cli --demo "How does this work?"
+
 # Authenticate first (one-time)
 cursor-cli login
 
@@ -190,6 +193,17 @@ pnpm dev
 | `↑` / `↓` | Scroll transcript / navigate selector |
 | `PgUp` / `PgDn` | Scroll transcript by page |
 | `Home` / `End` | Jump to top / bottom of transcript |
+
+## Demo Mode
+
+Test cursor-cli without an API key:
+
+```bash
+cursor-cli --demo "Explain what MCP servers are"
+cursor-cli --demo  # Interactive mode with simulated agent
+```
+
+Demo mode streams simulated agent responses with thinking, tool calls, and realistic typing delays — perfect for testing the UI and understanding agent behavior without a real API key.
 
 ## Configuration
 
