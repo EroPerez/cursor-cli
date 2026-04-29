@@ -4,6 +4,42 @@ A lightweight coding agent CLI powered by the [Cursor SDK](https://github.com/cu
 
 Supports an interactive TUI, one-shot prompts, piped input, and structured JSON output.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
+## Installation
+
+### One-line install (Linux / macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/eroperez/cursor-cli/main/install.sh | bash
+```
+
+This installs Bun and pnpm if needed, builds the project, and adds `cursor-cli` to your PATH.
+
+### Docker install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/eroperez/cursor-cli/main/docker-install.sh | bash
+# or, after cloning:
+bash docker-install.sh
+```
+
+Builds the Docker image, creates a persistent volume for config/sessions, and installs a `cursor-cli` wrapper in `~/.local/bin`.
+
+Custom image name or alias:
+```bash
+bash docker-install.sh --image my-cursor --tag v1 --alias ca
+```
+
+### Manual install
+
+```bash
+git clone https://github.com/eroperez/cursor-cli.git
+cd cursor-cli
+pnpm install
+pnpm build
+```
+
 ## Requirements
 
 - [Bun](https://bun.sh) 1.3 or newer
@@ -287,9 +323,58 @@ pnpm start          # Run compiled output
 pnpm typecheck      # Type-check without emitting
 ```
 
+## Docker
+
+### Build manually
+
+```bash
+docker build -t cursor-cli .
+```
+
+### Run without installing
+
+```bash
+# Interactive TUI with current directory mounted
+docker run --rm -it \
+  -e CURSOR_API_KEY="crsr_..." \
+  -v "$(pwd):/workspace" \
+  -v cursor-cli-data:/root/.cursor-cli \
+  cursor-cli .
+
+# One-shot prompt
+docker run --rm -it \
+  -e CURSOR_API_KEY="crsr_..." \
+  -v "$(pwd):/workspace" \
+  cursor-cli "Explain the auth flow"
+```
+
+### Docker Compose example
+
+```yaml
+services:
+  cursor:
+    build: .
+    stdin_open: true
+    tty: true
+    environment:
+      - CURSOR_API_KEY=${CURSOR_API_KEY}
+      - CURSOR_MODEL=${CURSOR_MODEL:-composer-2}
+    volumes:
+      - .:/workspace
+      - cursor-cli-data:/root/.cursor-cli
+    working_dir: /workspace
+
+volumes:
+  cursor-cli-data:
+```
+
 ## References
 
 - [Cursor SDK Cookbook](https://github.com/cursor/cookbook/tree/main/sdk/coding-agent-cli)
 - [Cursor SDK Docs](https://docs.cursor.com/sdk)
 - [OpenTUI](https://github.com/nicholasgasior/opentui)
 - [opencode](https://github.com/sst/opencode)
+
+## License
+
+[MIT](./LICENSE) © 2026 EroPerez
