@@ -15,6 +15,7 @@ import { printBanner } from "./banner.js"
 import { getGitContextString } from "./git-context.js"
 import { loadSessionById } from "./history.js"
 import { runLogin } from "./login.js"
+import { runDemoMode } from "./demo.js"
 import {
   addMcpServer,
   formatMcpServerList,
@@ -26,6 +27,7 @@ import { App } from "./tui/App.js"
 
 type CliOptions = {
   cwd: string
+  demo: boolean
   force: boolean
   help: boolean
   login: boolean
@@ -45,6 +47,11 @@ async function main() {
 
   if (options.help) {
     printHelp()
+    return
+  }
+
+  if (options.demo) {
+    await runDemoMode(options.cwd, options.prompt)
     return
   }
 
@@ -133,6 +140,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
   const DEFAULT_MODEL = process.env.CURSOR_MODEL ?? configModel ?? "composer-2"
   const promptParts: string[] = []
   let cwd = process.cwd()
+  let demo = false
   let force = false
   let help = false
   let login = false
@@ -151,6 +159,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
       break
     }
     if (arg === "--help" || arg === "-h") { help = true; continue }
+    if (arg === "--demo") { demo = true; continue }
     if (arg === "login") { login = true; continue }
     if (arg === "mcp") { mcp = argv.slice(index + 1); break }
     if (arg === "--force") { force = true; continue }
@@ -195,6 +204,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
 
   return {
     cwd: path.resolve(cwd),
+    demo,
     force,
     help,
     login,
@@ -379,6 +389,7 @@ Options:
   -C, --cwd <path>       Workspace directory. Defaults to current directory.
   -m, --model <id>       Model id. Defaults to CURSOR_MODEL env or composer-2.
   --theme <name>         Color theme: ${THEME_NAMES.join(", ")}.
+  --demo                 Demo mode (simulated agent, no API key needed).
   --verbose, -v          Show tool call details and thinking output.
   --json                 Emit newline-delimited JSON events (pipe-friendly).
   --no-git               Disable automatic git context injection.
@@ -412,6 +423,7 @@ Interactive slash commands:
   /exit, /quit           Exit the TUI.
 
 Examples:
+  cursor-agent --demo "How does this work?"  # Demo mode, no API key
   cursor-agent "Explain the auth flow"
   cursor-agent --cwd ../my-app "Add tests for the parser"
   cursor-agent --verbose --json "Refactor UserService"
