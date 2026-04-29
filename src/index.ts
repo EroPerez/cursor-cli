@@ -14,12 +14,14 @@ import { isThemeName, loadConfig, saveConfig, THEME_NAMES } from "./config.js"
 import { printBanner } from "./banner.js"
 import { getGitContextString } from "./git-context.js"
 import { loadSessionById } from "./history.js"
+import { runLogin } from "./login.js"
 import { App } from "./tui/App.js"
 
 type CliOptions = {
   cwd: string
   force: boolean
   help: boolean
+  login: boolean
   model: string
   prompt: string
   verbose: boolean
@@ -38,14 +40,19 @@ async function main() {
     return
   }
 
+  if (options.login) {
+    await runLogin()
+    return
+  }
+
   // Apply theme flag to config without persisting
   const effectiveTheme = isThemeName(options.theme) ? options.theme : config.theme
 
   const apiKey = process.env.CURSOR_API_KEY ?? config.apiKey
   if (!apiKey) {
-    throw new Error(
-      "Set CURSOR_API_KEY environment variable or run: cursor-agent /config apiKey <key>"
-    )
+    console.error("No API key found. Run: cursor-cli login")
+    process.exitCode = 1
+    return
   }
 
   const verbose = options.verbose || config.verbose
@@ -115,6 +122,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
   let cwd = process.cwd()
   let force = false
   let help = false
+  let login = false
   let model = DEFAULT_MODEL
   let verbose = false
   let json = false
@@ -129,6 +137,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
       break
     }
     if (arg === "--help" || arg === "-h") { help = true; continue }
+    if (arg === "login") { login = true; continue }
     if (arg === "--force") { force = true; continue }
     if (arg === "--verbose" || arg === "-v") { verbose = true; continue }
     if (arg === "--json") { json = true; continue }
@@ -173,6 +182,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
     cwd: path.resolve(cwd),
     force,
     help,
+    login,
     model,
     prompt: promptParts.join(" ").trim(),
     verbose,
@@ -341,8 +351,9 @@ function printHelp() {
   console.log(`Cursor Agent CLI — powered by @cursor/sdk
 
 Usage:
-  cursor-agent [options] "your task"
-  cursor-agent [options]
+  cursor-agent login               Authenticate via browser and save API key.
+  cursor-agent [options] "task"    Run a one-shot prompt.
+  cursor-agent [options]           Start the interactive TUI.
 
 Options:
   -C, --cwd <path>       Workspace directory. Defaults to current directory.
