@@ -3,8 +3,10 @@ FROM oven/bun:1.3-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm using the official installer (no npm required)
+RUN wget -qO- https://get.pnpm.io/install.sh | sh - && \
+    mv /root/.local/share/pnpm/pnpm /usr/local/bin/ && \
+    mv /root/.local/share/pnpm/pnpm-corepack /usr/local/bin/ 2>/dev/null || true
 
 # Copy manifests first for layer caching
 COPY package.json pnpm-lock.yaml* ./
@@ -38,8 +40,10 @@ VOLUME ["/root/.cursor-cli"]
 # Default workspace — mount your project here
 WORKDIR /workspace
 
-ENV CURSOR_API_KEY=""
+# Environment variables (do NOT include secrets in image)
+# User should pass at runtime: docker run -e CURSOR_API_KEY="crsr_..."
 ENV CURSOR_MODEL=""
 
 ENTRYPOINT ["bun", "/app/dist/index.js"]
 CMD ["--help"]
+
