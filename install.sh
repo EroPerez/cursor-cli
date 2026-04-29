@@ -55,26 +55,8 @@ check_bun() {
     info "bun not found. Installing..."
   fi
   curl -fsSL https://bun.sh/install | bash
-  # Source bun path in current shell
   export PATH="$HOME/.bun/bin:$PATH"
   success "bun installed"
-}
-
-check_pnpm() {
-  if command -v pnpm &>/dev/null; then
-    success "pnpm $(pnpm --version) found"
-    return 0
-  fi
-  info "pnpm not found. Installing..."
-  if command -v npm &>/dev/null; then
-    npm install -g pnpm
-  else
-    curl -fsSL https://get.pnpm.io/install.sh | sh -
-    # Source pnpm path in current shell
-    export PNPM_HOME="$HOME/.local/share/pnpm"
-    export PATH="$PNPM_HOME:$PATH"
-  fi
-  success "pnpm installed"
 }
 
 check_git() {
@@ -91,7 +73,6 @@ echo ""
 
 check_git
 check_bun
-check_pnpm
 
 CLONE_DIR="$(mktemp -d)"
 trap 'rm -rf "$CLONE_DIR"' EXIT
@@ -102,12 +83,10 @@ git clone --depth 1 "https://github.com/$REPO.git" "$CLONE_DIR" 2>/dev/null \
 success "Repository cloned"
 
 info "Installing dependencies..."
-(cd "$CLONE_DIR" && pnpm install --no-frozen-lockfile 2>/dev/null) \
-  || (cd "$CLONE_DIR" && pnpm install)
+(cd "$CLONE_DIR" && bun install)
 success "Dependencies installed"
 
 info "Building..."
-# Use bun to run tsc for compatibility
 (cd "$CLONE_DIR" && bun run build)
 success "Build complete"
 
