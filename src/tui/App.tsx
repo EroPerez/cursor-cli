@@ -31,6 +31,7 @@ import {
   slashCommands,
   type SlashCommandName,
 } from "../commands.js"
+import { CURSOR_BANNER } from "../banner.js"
 import { loadConfig, saveConfig, isThemeName, THEME_NAMES } from "../config.js"
 import {
   exportToMarkdown,
@@ -881,9 +882,13 @@ export function App({
   return (
     <box flexDirection="column" height={rows} paddingX={1}>
       <box flexDirection="column" height={transcriptViewportRows}>
-        {visibleTranscriptLines.map((line) => (
-          <TranscriptLine key={line.id} line={line} theme={theme} />
-        ))}
+        {transcript.length === 0 ? (
+          <text fg={theme.heading}>{CURSOR_BANNER}</text>
+        ) : (
+          visibleTranscriptLines.map((line) => (
+            <TranscriptLine key={line.id} line={line} theme={theme} />
+          ))
+        )}
       </box>
 
       {maxScrollOffset > 0 ? (
