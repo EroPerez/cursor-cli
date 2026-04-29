@@ -14,7 +14,7 @@ Supports an interactive TUI, one-shot prompts, piped input, and structured JSON 
 curl -fsSL https://raw.githubusercontent.com/eroperez/cursor-cli/main/install.sh | bash
 ```
 
-This installs Bun and pnpm if needed, builds the project, and adds `cursor-cli` to your PATH.
+This installs Bun if needed, builds the project, and adds `cursor-cli` to your PATH.
 
 ### Docker install
 
@@ -36,21 +36,14 @@ bash docker-install.sh --image my-cursor --tag v1 --alias ca
 ```bash
 git clone https://github.com/eroperez/cursor-cli.git
 cd cursor-cli
-pnpm install
-pnpm build
+bun install
+bun run build
 ```
 
 ## Requirements
 
 - [Bun](https://bun.sh) 1.3 or newer
-- [pnpm](https://pnpm.io) 10.9 or newer
 - A Cursor API key (`crsr_...`)
-
-## Installation
-
-```bash
-pnpm install
-```
 
 ## Setup
 
@@ -63,7 +56,7 @@ export CURSOR_API_KEY="crsr_..."
 Or save it to the config file:
 
 ```bash
-pnpm dev /config apiKey crsr_...
+bun run dev /config apiKey crsr_...
 ```
 
 ## Usage
@@ -88,38 +81,38 @@ pnpm dev /config apiKey crsr_...
 
 ```bash
 # Interactive TUI
-pnpm dev
+bun run dev
 
 # One-shot prompt
-pnpm dev "Explain the auth flow"
+bun run dev "Explain the auth flow"
 
 # With a specific workspace
-pnpm dev --cwd ../my-app "Add tests for the parser"
+bun run dev --cwd ../my-app "Add tests for the parser"
 ```
 
 ### All Options
 
 ```bash
 # Pipe a prompt
-printf "Summarize recent changes" | ./cursor-cli .
+printf "Summarize recent changes" | cursor-cli .
 
 # Verbose tool output
-./cursor-cli . --verbose "Refactor UserService"
+cursor-cli . --verbose "Refactor UserService"
 
 # JSON output (pipe-friendly)
-./cursor-cli . --json "List all API endpoints" | jq '.text'
+cursor-cli . --json "List all API endpoints" | jq '.text'
 
 # Override the model
-./cursor-cli . --model composer-2 "Review this PR"
+cursor-cli . --model composer-2 "Review this PR"
 
 # Override the theme
-./cursor-cli . --theme dracula
+cursor-cli . --theme dracula
 
 # Disable git context injection
-./cursor-cli . --no-git "What does this file do?"
+cursor-cli . --no-git "What does this file do?"
 
 # Resume a saved session
-./cursor-cli . --resume abc12345
+cursor-cli . --resume abc12345
 ```
 
 ## CLI Options
@@ -159,6 +152,7 @@ pnpm dev
 | `/local` | Switch to local workspace execution |
 | `/cloud` | Switch to Cursor cloud execution |
 | `/model` | Open interactive model picker |
+| `/models` | List all available Cursor models |
 | `/theme [name]` | Switch color theme or open picker |
 | `/reset` | Start a fresh agent, keep session |
 | `/clear` | Clear the transcript |
@@ -201,13 +195,13 @@ Manage config from the CLI:
 
 ```bash
 # View all settings
-pnpm dev /config
+bun run dev /config
 
 # Change theme
-pnpm dev /config theme nord
+bun run dev /config theme nord
 
 # Disable git auto-context
-pnpm dev /config autoGitContext false
+bun run dev /config autoGitContext false
 ```
 
 ## Themes
@@ -225,7 +219,7 @@ Five built-in color themes:
 Switch theme interactively with `/theme` or set permanently:
 
 ```bash
-pnpm dev --theme nord
+bun run dev --theme nord
 ```
 
 ## Features
@@ -274,7 +268,7 @@ Sessions are automatically saved after each exchange to `~/.cursor-cli/sessions/
 /export session.md
 
 # Resume a session
-pnpm dev --resume <session-id>
+cursor-cli . --resume <session-id>
 ```
 
 ### JSON Output
@@ -282,7 +276,7 @@ pnpm dev --resume <session-id>
 Use `--json` for structured newline-delimited JSON, suitable for piping to tools like `jq`:
 
 ```bash
-pnpm dev --json "List the main API routes" | jq 'select(.type=="delta") | .text' -r
+cursor-cli . --json "List the main API routes" | jq 'select(.type=="delta") | .text' -r
 
 # Event types: delta, thinking, tool, status, task, result
 ```
@@ -303,6 +297,7 @@ The agent summarizes the exchange and replaces the transcript with a condensed v
 src/
 ├── index.ts          # CLI entry point, argument parsing, plain/TUI modes
 ├── agent.ts          # CodingAgentSession — wraps @cursor/sdk
+├── banner.ts         # ASCII art banner for interactive mode
 ├── commands.ts       # Slash command registry and parsing
 ├── config.ts         # Persistent configuration (~/.cursor-cli/config.json)
 ├── history.ts        # Session storage, resume, markdown export
@@ -317,10 +312,10 @@ src/
 ## Scripts
 
 ```bash
-pnpm dev            # Run from source (bun)
-pnpm build          # Compile TypeScript to dist/
-pnpm start          # Run compiled output
-pnpm typecheck      # Type-check without emitting
+bun run dev         # Run from source with Bun
+bun run build       # Compile TypeScript to dist/
+bun run start       # Run compiled output with Bun
+bun run typecheck   # Type-check without emitting
 ```
 
 ## Docker
