@@ -28,6 +28,7 @@ import {
   getCommandArg,
   getSlashCommand,
   getSlashCommandItems,
+  slashCommands,
   type SlashCommandName,
 } from "../commands.js"
 import { loadConfig, saveConfig, isThemeName, THEME_NAMES } from "../config.js"
@@ -689,7 +690,13 @@ export function App({
   }
 
   const selectCommand = (item: CommandSelectItem) => {
-    void runCommand(item.value)
+    const cmd = slashCommands.find((c) => c.name === item.value)
+    if (cmd?.takesArg) {
+      setMode("input")
+      setInput(`${item.value} `)
+    } else {
+      void runCommand(item.value)
+    }
   }
 
   const selectCommandOption = (_index: number, option: SelectOption | null) => {
