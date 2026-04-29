@@ -10,6 +10,7 @@ export type SlashCommandName =
   | "/history"
   | "/local"
   | "/model"
+  | "/models"
   | "/quit"
   | "/reset"
   | "/theme"
@@ -27,6 +28,7 @@ export const slashCommands: SlashCommand[] = [
   { name: "/local", summary: "Run future prompts in the local workspace." },
   { name: "/cloud", summary: "Run future prompts in Cursor cloud." },
   { name: "/model", summary: "Open a picker with available Cursor models." },
+  { name: "/models", summary: "List all available Cursor models." },
   { name: "/theme", summary: "Switch color theme (dark/light/dracula/nord/monokai).", takesArg: true },
   { name: "/reset", summary: "Start a fresh agent and clear context." },
   { name: "/clear", summary: "Clear the conversation transcript." },

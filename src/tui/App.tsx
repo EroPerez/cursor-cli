@@ -379,6 +379,22 @@ export function App({
         await openModelPicker()
         break
 
+      case "/models": {
+        const modelsSession = sessionRef.current
+        if (!modelsSession) break
+        setBusy(true)
+        try {
+          const choices = await modelsSession.listModels()
+          const lines = choices.map((c: ModelChoice) => `  ${c.label}${c.description ? `  — ${c.description}` : ""}`)
+          addEntry("meta", "models", `Available models (${choices.length}):\n${lines.join("\n")}`)
+        } catch (error) {
+          addEntry("error", "models", getErrorMessage(error))
+        } finally {
+          setBusy(false)
+        }
+        break
+      }
+
       case "/local":
         await switchExecutionMode("local")
         break
