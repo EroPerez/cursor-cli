@@ -15,6 +15,13 @@ import { printBanner } from "./banner.js"
 import { getGitContextString } from "./git-context.js"
 import { loadSessionById } from "./history.js"
 import { runLogin } from "./login.js"
+import {
+  addMcpServer,
+  formatMcpServerList,
+  loadMcpServers,
+  parseMcpAddArgs,
+  removeMcpServer,
+} from "./mcp.js"
 import { App } from "./tui/App.js"
 
 type CliOptions = {
@@ -22,6 +29,7 @@ type CliOptions = {
   force: boolean
   help: boolean
   login: boolean
+  mcp: string[]
   model: string
   prompt: string
   verbose: boolean
@@ -42,6 +50,11 @@ async function main() {
 
   if (options.login) {
     await runLogin()
+    return
+  }
+
+  if (options.mcp) {
+    runMcpCommand(options.mcp)
     return
   }
 
@@ -123,6 +136,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
   let force = false
   let help = false
   let login = false
+  let mcp: string[] = []
   let model = DEFAULT_MODEL
   let verbose = false
   let json = false
@@ -138,6 +152,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
     }
     if (arg === "--help" || arg === "-h") { help = true; continue }
     if (arg === "login") { login = true; continue }
+    if (arg === "mcp") { mcp = argv.slice(index + 1); break }
     if (arg === "--force") { force = true; continue }
     if (arg === "--verbose" || arg === "-v") { verbose = true; continue }
     if (arg === "--json") { json = true; continue }
@@ -183,6 +198,7 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
     force,
     help,
     login,
+    mcp,
     model,
     prompt: promptParts.join(" ").trim(),
     verbose,
@@ -351,9 +367,13 @@ function printHelp() {
   console.log(`Cursor Agent CLI — powered by @cursor/sdk
 
 Usage:
-  cursor-agent login               Authenticate via browser and save API key.
-  cursor-agent [options] "task"    Run a one-shot prompt.
-  cursor-agent [options]           Start the interactive TUI.
+  cursor-agent login                      Authenticate via browser and save API key.
+  cursor-agent mcp list                   List configured MCP servers.
+  cursor-agent mcp add <name> --command <cmd> [args...]
+  cursor-agent mcp add <name> --url <url> [--type http|sse]
+  cursor-agent mcp remove <name>          Remove an MCP server.
+  cursor-agent [options] "task"           Run a one-shot prompt.
+  cursor-agent [options]                  Start the interactive TUI.
 
 Options:
   -C, --cwd <path>       Workspace directory. Defaults to current directory.
@@ -375,6 +395,10 @@ Interactive slash commands:
   /local                 Switch to local workspace execution.
   /cloud                 Switch to Cursor cloud execution.
   /model                 Open model picker.
+  /models                List all available models.
+  /mcp [list]            List configured MCP servers.
+  /mcp add <name> ...    Add an MCP server.
+  /mcp remove <name>     Remove an MCP server.
   /theme [name]          Switch color theme or open theme picker.
   /reset                 Fresh agent, same session.
   /clear                 Clear the transcript.
@@ -394,6 +418,42 @@ Examples:
   cursor-agent
   printf "Review recent changes" | cursor-agent
   `)
+}
+
+function runMcpCommand(args: string[]) {
+  const sub = args[0]
+
+  if (!sub || sub === "list") {
+    console.log(formatMcpServerList(loadMcpServers()))
+    return
+  }
+
+  if (sub === "add") {
+    const result = parseMcpAddArgs(args.slice(1))
+    if (typeof result === "string") {
+      console.error(result)
+      process.exitCode = 1
+      return
+    }
+    addMcpServer(result.name, result.config)
+    console.log(`Added MCP server "${result.name}".`)
+    return
+  }
+
+  if (sub === "remove") {
+    const name = args[1]
+    if (!name) {
+      console.error("Usage: cursor-cli mcp remove <name>")
+      process.exitCode = 1
+      return
+    }
+    const removed = removeMcpServer(name)
+    console.log(removed ? `Removed MCP server "${name}".` : `No server named "${name}".`)
+    return
+  }
+
+  console.error(`Unknown mcp subcommand "${sub}". Use: list | add | remove`)
+  process.exitCode = 1
 }
 
 main().catch((error) => {

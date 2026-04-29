@@ -9,6 +9,7 @@ export type SlashCommandName =
   | "/help"
   | "/history"
   | "/local"
+  | "/mcp"
   | "/model"
   | "/models"
   | "/quit"
@@ -27,6 +28,7 @@ export const slashCommands: SlashCommand[] = [
   { name: "/help", summary: "Show available commands." },
   { name: "/local", summary: "Run future prompts in the local workspace." },
   { name: "/cloud", summary: "Run future prompts in Cursor cloud." },
+  { name: "/mcp", summary: "Manage MCP servers (list / add / remove).", takesArg: true },
   { name: "/model", summary: "Open a picker with available Cursor models." },
   { name: "/models", summary: "List all available Cursor models." },
   { name: "/theme", summary: "Switch color theme (dark/light/dracula/nord/monokai).", takesArg: true },
