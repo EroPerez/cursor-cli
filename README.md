@@ -32,6 +32,24 @@ pnpm dev /config apiKey crsr_...
 
 ## Usage
 
+### Quick Start
+
+```bash
+# Interactive TUI (current directory)
+./cursor-cli .
+
+# One-shot prompt (current directory)
+./cursor-cli "Explain the auth flow"
+
+# TUI in a different workspace
+./cursor-cli /path/to/project
+
+# One-shot with a specific workspace
+./cursor-cli /path/to/project "Add tests for the parser"
+```
+
+### Development Mode
+
 ```bash
 # Interactive TUI
 pnpm dev
@@ -41,27 +59,31 @@ pnpm dev "Explain the auth flow"
 
 # With a specific workspace
 pnpm dev --cwd ../my-app "Add tests for the parser"
+```
 
+### All Options
+
+```bash
 # Pipe a prompt
-printf "Summarize recent changes" | pnpm dev
+printf "Summarize recent changes" | ./cursor-cli .
 
 # Verbose tool output
-pnpm dev --verbose "Refactor UserService"
+./cursor-cli . --verbose "Refactor UserService"
 
 # JSON output (pipe-friendly)
-pnpm dev --json "List all API endpoints" | jq '.text'
+./cursor-cli . --json "List all API endpoints" | jq '.text'
 
 # Override the model
-pnpm dev --model gpt-4o "Review this PR"
+./cursor-cli . --model composer-2 "Review this PR"
 
 # Override the theme
-pnpm dev --theme dracula
+./cursor-cli . --theme dracula
 
 # Disable git context injection
-pnpm dev --no-git "What does this file do?"
+./cursor-cli . --no-git "What does this file do?"
 
 # Resume a saved session
-pnpm dev --resume abc12345
+./cursor-cli . --resume abc12345
 ```
 
 ## CLI Options
