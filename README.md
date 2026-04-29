@@ -79,13 +79,13 @@ cursor-cli login
 cursor-cli .
 
 # One-shot prompt (current directory)
-./cursor-cli "Explain the auth flow"
+cursor-cli "Explain the auth flow"
 
 # TUI in a different workspace
-./cursor-cli /path/to/project
+cursor-cli /path/to/project
 
 # One-shot with a specific workspace
-./cursor-cli /path/to/project "Add tests for the parser"
+cursor-cli /path/to/project "Add tests for the parser"
 ```
 
 ### Development Mode
@@ -144,7 +144,7 @@ cursor-cli . --resume abc12345
 
 | Variable | Description |
 |----------|-------------|
-| `CURSOR_API_KEY` | Required. Your Cursor API key (`crsr_...`) |
+| `CURSOR_API_KEY` | API key (`crsr_...`). Optional if saved via `cursor-cli login` |
 | `CURSOR_MODEL` | Optional. Default model id override |
 
 ## Interactive TUI
