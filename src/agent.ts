@@ -24,6 +24,17 @@ export type AgentEvent =
   | { type: "task"; status?: string; text?: string }
   | { type: "result"; status: string; durationMs?: number; usage?: TokenUsage }
 
+export type ContextFile = {
+  path: string
+  content: string
+}
+
+export type PromptContext = {
+  gitContext?: string
+  fileContexts?: ContextFile[]
+  searchContext?: string
+}
+
 export type ModelChoice = {
   label: string
   value: ModelSelection
@@ -52,6 +63,7 @@ type CodingAgentSessionOptions = {
 
 type SendPromptOptions = {
   prompt: string
+  context?: PromptContext
   onEvent: (event: AgentEvent) => void
 }
 
@@ -156,9 +168,9 @@ export class CodingAgentSession {
     return { cancelled: true }
   }
 
-  async sendPrompt({ prompt, onEvent }: SendPromptOptions) {
+  async sendPrompt({ prompt, context, onEvent }: SendPromptOptions) {
     await this.ensureAgentFresh()
-    const run = await this.agent.send(buildPrompt(prompt), {
+    const run = await this.agent.send(buildPrompt(prompt, context), {
       ...(this.mode === "local" ? { model: this.modelSelection } : {}),
       ...(this.mode === "local" && this.force ? { local: { force: true } } : {}),
     })
@@ -227,8 +239,27 @@ export class CodingAgentSession {
   }
 }
 
-export function buildPrompt(prompt: string) {
-  return [AGENT_INSTRUCTIONS, "", "User task:", prompt].join("\n")
+export function buildPrompt(prompt: string, context?: PromptContext): string {
+  const parts: string[] = [AGENT_INSTRUCTIONS, ""]
+
+  if (context?.gitContext) {
+    parts.push("## Repository Context", "", context.gitContext, "")
+  }
+
+  if (context?.fileContexts?.length) {
+    parts.push("## File Context", "")
+    for (const file of context.fileContexts) {
+      const ext = file.path.split(".").pop() ?? ""
+      parts.push(`### ${file.path}`, `\`\`\`${ext}`, file.content, "```", "")
+    }
+  }
+
+  if (context?.searchContext) {
+    parts.push("## Web Search Results", "", context.searchContext, "")
+  }
+
+  parts.push("User task:", prompt)
+  return parts.join("\n")
 }
 
 export function formatModelLabel(model: ModelSelection) {

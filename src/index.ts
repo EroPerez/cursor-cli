@@ -8,7 +8,11 @@ import {
   CodingAgentSession,
   formatDuration,
   type AgentEvent,
+  type PromptContext,
 } from "./agent.js"
+import { isThemeName, loadConfig, saveConfig, THEME_NAMES } from "./config.js"
+import { getGitContextString } from "./git-context.js"
+import { loadSessionById } from "./history.js"
 import { App } from "./tui/App.js"
 
 type CliOptions = {
@@ -17,41 +21,68 @@ type CliOptions = {
   help: boolean
   model: string
   prompt: string
+  verbose: boolean
+  json: boolean
+  noGit: boolean
+  theme: string
+  resume: string
 }
 
-const DEFAULT_MODEL = process.env.CURSOR_MODEL ?? "composer-2"
-
 async function main() {
-  const options = parseArgs(process.argv.slice(2))
+  const config = loadConfig()
+  const options = parseArgs(process.argv.slice(2), config.model)
+
   if (options.help) {
     printHelp()
     return
   }
-  const apiKey = process.env.CURSOR_API_KEY
+
+  // Apply theme flag to config without persisting
+  const effectiveTheme = isThemeName(options.theme) ? options.theme : config.theme
+
+  const apiKey = process.env.CURSOR_API_KEY ?? config.apiKey
   if (!apiKey) {
-    throw new Error("Set CURSOR_API_KEY before running the CLI.")
+    throw new Error(
+      "Set CURSOR_API_KEY environment variable or run: cursor-agent /config apiKey <key>"
+    )
   }
+
+  const verbose = options.verbose || config.verbose
+  const useGit = !options.noGit && config.autoGitContext
+
   if (options.prompt) {
-    await runPlainPrompt(apiKey, options, options.prompt)
+    const gitContext = useGit ? getGitContextString(options.cwd) : undefined
+    await runPlainPrompt(apiKey, options, options.prompt, { gitContext }, verbose, options.json)
     return
   }
+
   if (!process.stdin.isTTY) {
     const prompt = (await readStdin()).trim()
     if (!prompt) {
       throw new Error("No prompt provided on stdin.")
     }
-    await runPlainPrompt(apiKey, options, prompt)
+    const gitContext = useGit ? getGitContextString(options.cwd) : undefined
+    await runPlainPrompt(apiKey, options, prompt, { gitContext }, verbose, options.json)
     return
   }
+
   if (!process.stdout.isTTY) {
     throw new Error("Interactive mode requires a TTY stdout.")
   }
+
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
     maxFps: 30,
     screenMode: "alternate-screen",
   })
   const root = createRoot(renderer)
+
+  // Load a session to resume if requested
+  const resumeSession = options.resume ? loadSessionById(options.resume) : undefined
+  if (options.resume && !resumeSession) {
+    process.stderr.write(`Warning: session "${options.resume}" not found, starting fresh.\n`)
+  }
+
   try {
     root.render(
       React.createElement(App, {
@@ -59,6 +90,11 @@ async function main() {
         cwd: options.cwd,
         force: options.force,
         initialModel: { id: options.model },
+        initialTheme: effectiveTheme,
+        verbose,
+        autoGitContext: useGit,
+        resumeSession,
+        maxHistorySessions: config.maxHistorySessions,
       })
     )
     await waitUntilDestroyed(renderer)
@@ -70,45 +106,59 @@ async function main() {
   }
 }
 
-function parseArgs(argv: string[]): CliOptions {
+function parseArgs(argv: string[], configModel: string | undefined): CliOptions {
+  const DEFAULT_MODEL = process.env.CURSOR_MODEL ?? configModel ?? "composer-2"
   const promptParts: string[] = []
   let cwd = process.cwd()
   let force = false
   let help = false
   let model = DEFAULT_MODEL
+  let verbose = false
+  let json = false
+  let noGit = false
+  let theme = ""
+  let resume = ""
 
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index]
+    const arg = argv[index]!
     if (arg === "--") {
       promptParts.push(...argv.slice(index + 1))
       break
     }
-    if (arg === "--help" || arg === "-h") {
-      help = true
-      continue
-    }
-    if (arg === "--force") {
-      force = true
-      continue
-    }
+    if (arg === "--help" || arg === "-h") { help = true; continue }
+    if (arg === "--force") { force = true; continue }
+    if (arg === "--verbose" || arg === "-v") { verbose = true; continue }
+    if (arg === "--json") { json = true; continue }
+    if (arg === "--no-git") { noGit = true; continue }
+
     if (arg === "--cwd" || arg === "-C") {
       cwd = readOptionValue(argv, index, arg)
       index += 1
       continue
     }
-    if (arg.startsWith("--cwd=")) {
-      cwd = arg.slice("--cwd=".length)
-      continue
-    }
+    if (arg.startsWith("--cwd=")) { cwd = arg.slice("--cwd=".length); continue }
+
     if (arg === "--model" || arg === "-m") {
       model = readOptionValue(argv, index, arg)
       index += 1
       continue
     }
-    if (arg.startsWith("--model=")) {
-      model = arg.slice("--model=".length)
+    if (arg.startsWith("--model=")) { model = arg.slice("--model=".length); continue }
+
+    if (arg === "--theme") {
+      theme = readOptionValue(argv, index, arg)
+      index += 1
       continue
     }
+    if (arg.startsWith("--theme=")) { theme = arg.slice("--theme=".length); continue }
+
+    if (arg === "--resume") {
+      resume = readOptionValue(argv, index, arg)
+      index += 1
+      continue
+    }
+    if (arg.startsWith("--resume=")) { resume = arg.slice("--resume=".length); continue }
+
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`)
     }
@@ -122,6 +172,11 @@ function parseArgs(argv: string[]): CliOptions {
     help,
     model,
     prompt: promptParts.join(" ").trim(),
+    verbose,
+    json,
+    noGit,
+    theme,
+    resume,
   }
 }
 
@@ -136,7 +191,10 @@ function readOptionValue(argv: string[], index: number, option: string) {
 async function runPlainPrompt(
   apiKey: string,
   options: CliOptions,
-  prompt: string
+  prompt: string,
+  context: PromptContext,
+  verbose: boolean,
+  jsonMode: boolean
 ) {
   const session = new CodingAgentSession({
     apiKey,
@@ -148,21 +206,30 @@ async function runPlainPrompt(
   let assistantEndedWithNewline = true
 
   const annotate = (message: string) => {
-    if (!assistantEndedWithNewline) {
-      process.stderr.write("\n")
+    if (!jsonMode) {
+      if (!assistantEndedWithNewline) process.stderr.write("\n")
+      process.stderr.write(`${message}\n`)
+      assistantEndedWithNewline = true
     }
-    process.stderr.write(`${message}\n`)
-    assistantEndedWithNewline = true
+  }
+
+  const emitJson = (obj: Record<string, unknown>) => {
+    process.stdout.write(JSON.stringify(obj) + "\n")
   }
 
   try {
     await session.sendPrompt({
       prompt,
+      context,
       onEvent: (event) => {
-        renderPlainEvent(event, annotate, (text) => {
-          process.stdout.write(text)
-          assistantEndedWithNewline = text.endsWith("\n")
-        })
+        if (jsonMode) {
+          renderJsonEvent(event, emitJson)
+        } else {
+          renderPlainEvent(event, annotate, verbose, (text) => {
+            process.stdout.write(text)
+            assistantEndedWithNewline = text.endsWith("\n")
+          })
+        }
       },
     })
   } finally {
@@ -170,9 +237,41 @@ async function runPlainPrompt(
   }
 }
 
+function renderJsonEvent(
+  event: AgentEvent,
+  emit: (obj: Record<string, unknown>) => void
+) {
+  switch (event.type) {
+    case "assistant_delta":
+      emit({ type: "delta", text: event.text })
+      break
+    case "thinking":
+      emit({ type: "thinking", text: event.text })
+      break
+    case "tool":
+      emit({ type: "tool", name: event.name, status: event.status, params: event.params })
+      break
+    case "status":
+      emit({ type: "status", status: event.status, message: event.message })
+      break
+    case "task":
+      emit({ type: "task", status: event.status, text: event.text })
+      break
+    case "result":
+      emit({
+        type: "result",
+        status: event.status,
+        duration_ms: event.durationMs,
+        usage: event.usage,
+      })
+      break
+  }
+}
+
 function renderPlainEvent(
   event: AgentEvent,
   annotate: (message: string) => void,
+  verbose: boolean,
   writeAssistant: (text: string) => void
 ) {
   switch (event.type) {
@@ -181,16 +280,17 @@ function renderPlainEvent(
       break
     case "thinking": {
       const text = compactText(event.text)
-      if (text) {
-        annotate(`[thinking] ${text}`)
-      }
+      if (text && verbose) annotate(`[thinking] ${text}`)
       break
     }
     case "tool":
-      annotate(`[tool] ${event.status} ${event.name}`)
+      if (verbose || event.status === "error") {
+        const params = event.params ? ` ${event.params}` : ""
+        annotate(`[tool] ${event.status} ${event.name}${params}`)
+      }
       break
     case "status":
-      if (event.status !== "FINISHED") {
+      if (event.status !== "FINISHED" && event.status !== "RUNNING") {
         annotate(`[status] ${event.status}${event.message ? ` ${event.message}` : ""}`)
       }
       break
@@ -228,43 +328,57 @@ async function readStdin() {
 }
 
 function waitUntilDestroyed(renderer: CliRenderer) {
-  if (renderer.isDestroyed) {
-    return Promise.resolve()
-  }
+  if (renderer.isDestroyed) return Promise.resolve()
   return new Promise<void>((resolve) => {
     renderer.once(CliRenderEvents.DESTROY, () => resolve())
   })
 }
 
 function printHelp() {
-  console.log(`Lightweight coding agent CLI powered by Cursor
+  console.log(`Cursor Agent CLI — powered by @cursor/sdk
 
 Usage:
   cursor-agent [options] "your task"
   cursor-agent [options]
 
 Options:
-  -C, --cwd <path>     Workspace directory for the local agent. Defaults to cwd.
-  -m, --model <id>     Model id. Defaults to CURSOR_MODEL or composer-2.
-  --force              Expire a stuck active local run before starting.
-  -h, --help           Show this help.
+  -C, --cwd <path>       Workspace directory. Defaults to current directory.
+  -m, --model <id>       Model id. Defaults to CURSOR_MODEL env or composer-2.
+  --theme <name>         Color theme: ${THEME_NAMES.join(", ")}.
+  --verbose, -v          Show tool call details and thinking output.
+  --json                 Emit newline-delimited JSON events (pipe-friendly).
+  --no-git               Disable automatic git context injection.
+  --force                Expire a stuck local run before starting.
+  --resume <id>          Resume a saved session by id in interactive mode.
+  -h, --help             Show this help.
 
 Environment:
-  CURSOR_API_KEY       Required. Your Cursor API key (crsr_...).
-  CURSOR_MODEL         Optional. Default model id override.
+  CURSOR_API_KEY         Required. Your Cursor API key (crsr_...).
+  CURSOR_MODEL           Optional. Default model override.
 
-Interactive commands:
-  /local       Run future prompts in the local workspace.
-  /cloud       Run future prompts in Cursor cloud.
-  /model       Open the model picker.
-  /reset       Start a fresh agent in the current execution mode.
-  /exit        Exit the TUI.
+Interactive slash commands:
+  /help                  Show command list.
+  /local                 Switch to local workspace execution.
+  /cloud                 Switch to Cursor cloud execution.
+  /model                 Open model picker.
+  /theme [name]          Switch color theme or open theme picker.
+  /reset                 Fresh agent, same session.
+  /clear                 Clear the transcript.
+  /compact               Summarize conversation to save context.
+  /history               Browse and resume past sessions.
+  /export [file]         Export transcript to markdown.
+  /web <query>           Search DuckDuckGo and inject results as context.
+  /context [file]        Add a file to the prompt context (list if no arg).
+  /verbose               Toggle verbose tool output.
+  /config [key value]    View or edit persistent config.
+  /exit, /quit           Exit the TUI.
 
 Examples:
   cursor-agent "Explain the auth flow"
-  cursor-agent --cwd ../my-app "Add a regression test for the parser"
+  cursor-agent --cwd ../my-app "Add tests for the parser"
+  cursor-agent --verbose --json "Refactor UserService"
   cursor-agent
-  printf "Review the recent changes" | cursor-agent
+  printf "Review recent changes" | cursor-agent
   `)
 }
 
