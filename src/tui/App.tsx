@@ -37,6 +37,7 @@ import {
   generateSessionId,
   listSessions,
   saveSession,
+  type SessionMessage,
   type SessionRecord,
 } from "../history.js"
 import { webSearch, formatSearchResults } from "../search.js"
@@ -131,7 +132,9 @@ export function App({
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([])
   const [lastSearchContext, setLastSearchContext] = useState<string>()
   const [sessionId] = useState(generateSessionId())
-  const [sessionMessages, setSessionMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([])
+  const [sessionMessages, setSessionMessages] = useState<SessionMessage[]>(
+    resumeSession?.messages ?? []
+  )
   const [historyItems, setHistoryItems] = useState<SessionRecord[]>([])
   const [themeItems] = useState<ThemeSelectItem[]>(
     THEME_NAMES.map((t) => ({
@@ -553,7 +556,7 @@ export function App({
                 text: summary,
               },
             ])
-            setSessionMessages([{ role: "assistant", text: summary }])
+            setSessionMessages([{ role: "assistant", text: summary, timestamp: Date.now() }])
           }
         } catch (error) {
           addEntry("error", "compact", getErrorMessage(error))
@@ -638,13 +641,13 @@ export function App({
   }
 
   const selectHistoryOption = (_index: number, option: SelectOption | null) => {
-    const item = toHistorySelectItem(option, filteredHistoryItems)
+    const item = filteredHistoryItems.find((h) => h.id === option?.value)
     if (item) {
       setMode("input")
-      addEntry("status", "history", `Loaded session: ${item.name}`)
-      setSessionMessages(item.value.messages)
+      addEntry("status", "history", `Loaded session: ${formatSessionLabel(item)}`)
+      setSessionMessages(item.messages)
       setTranscript(
-        item.value.messages.map((m, i) => ({
+        item.messages.map((m, i) => ({
           id: String(i),
           kind: m.role === "user" ? ("user" as const) : ("assistant" as const),
           label: m.role === "user" ? "you" : "agent",
@@ -717,7 +720,7 @@ export function App({
       text: prompt,
     }
     setTranscript((items) => [...items, userEntry])
-    setSessionMessages((m) => [...m, { role: "user", text: prompt }])
+    setSessionMessages((m) => [...m, { role: "user", text: prompt, timestamp: Date.now() }])
 
     const promptContext: PromptContext = {
       fileContexts: contextFiles,
@@ -740,18 +743,24 @@ export function App({
           if (event.type === "assistant_delta") assistantText += event.text
         },
       })
+      const now = Date.now()
       if (assistantText) {
-        setSessionMessages((m) => [...m, { role: "assistant", text: assistantText }])
+        setSessionMessages((m) => [...m, { role: "assistant", text: assistantText, timestamp: now }])
       }
+      const updatedMessages = [
+        ...sessionMessages,
+        { role: "user" as const, text: prompt, timestamp: now },
+        ...(assistantText ? [{ role: "assistant" as const, text: assistantText, timestamp: now }] : []),
+      ]
       saveSession(
         {
           id: sessionId,
-          timestamp: Date.now(),
+          timestamp: now,
           cwd,
           model: model.id,
           executionMode,
           preview: prompt.slice(0, 50),
-          messages: [...sessionMessages, { role: "user", text: prompt }, { role: "assistant", text: assistantText }],
+          messages: updatedMessages,
         },
         maxHistorySessions
       )
@@ -888,9 +897,9 @@ export function App({
               focused={mode === "history"}
               height={historySelectRows}
               options={filteredHistoryItems.map((h) => ({
-                key: h.value.id,
-                label: formatSessionLabel(h.value),
-                value: h.value,
+                name: formatSessionLabel(h),
+                description: `${h.messages.length} messages`,
+                value: h.id,
               }))}
               onSelect={selectHistoryOption}
               showScrollIndicator
