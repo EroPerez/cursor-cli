@@ -11,6 +11,7 @@ import {
   type PromptContext,
 } from "./agent.js"
 import { isThemeName, loadConfig, saveConfig, THEME_NAMES } from "./config.js"
+import { printBanner } from "./banner.js"
 import { getGitContextString } from "./git-context.js"
 import { loadSessionById } from "./history.js"
 import { App } from "./tui/App.js"
@@ -69,6 +70,8 @@ async function main() {
   if (!process.stdout.isTTY) {
     throw new Error("Interactive mode requires a TTY stdout.")
   }
+
+  printBanner()
 
   const renderer = await createCliRenderer({
     exitOnCtrlC: false,
