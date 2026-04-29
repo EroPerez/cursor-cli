@@ -166,6 +166,9 @@ export function App({
 
   useEffect(() => {
     const session = sessionRef.current
+    if (session) {
+      void session.ensureAgentReady()
+    }
     return () => {
       void session?.dispose()
     }

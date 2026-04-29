@@ -100,8 +100,15 @@ export class CodingAgentSession {
     this.mode = options.executionMode ?? "local"
     this.modelSelection = options.model
     this.mcpServers = options.mcpServers ?? {}
-    this.agent = this.createAgent() as unknown as SDKAgent
+    // Agent will be initialized async via ensureAgentReady()
+    this.agent = null as any
     this.agentKey = this.currentAgentKey()
+  }
+
+  async ensureAgentReady() {
+    if (!this.agent) {
+      this.agent = await this.createAgent()
+    }
   }
 
   setMcpServers(servers: McpServers) {
@@ -202,7 +209,7 @@ export class CodingAgentSession {
     }
   }
 
-  private createAgent() {
+  private async createAgent(): Promise<SDKAgent> {
     const mcpServers = Object.keys(this.mcpServers).length > 0 ? this.mcpServers : undefined
     const options = {
       apiKey: this.apiKey,
@@ -213,23 +220,24 @@ export class CodingAgentSession {
     if (this.mode === "cloud") {
       const repository = detectCloudRepository(this.cwd)
       this.cloudRepository = repository
-      return Agent.create({
+      return (await Agent.create({
         ...options,
         cloud: {
           repos: [repository],
         },
-      })
+      })) as SDKAgent
     }
     this.cloudRepository = null
-    return Agent.create({
+    return (await Agent.create({
       ...options,
       local: {
         cwd: this.cwd,
       },
-    })
+    })) as SDKAgent
   }
 
   private async ensureAgentFresh() {
+    await this.ensureAgentReady()
     if (this.agentKey !== this.currentAgentKey()) {
       await this.replaceAgent()
     }
@@ -237,9 +245,11 @@ export class CodingAgentSession {
 
   private async replaceAgent() {
     const previousAgent = this.agent
-    this.agent = this.createAgent() as unknown as SDKAgent
+    this.agent = await this.createAgent()
     this.agentKey = this.currentAgentKey()
-    await previousAgent[Symbol.asyncDispose]()
+    if (previousAgent?.[Symbol.asyncDispose]) {
+      await previousAgent[Symbol.asyncDispose]()
+    }
   }
 
   private currentAgentKey() {

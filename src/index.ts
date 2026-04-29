@@ -257,6 +257,7 @@ async function runPlainPrompt(
   }
 
   try {
+    await session.ensureAgentReady()
     await session.sendPrompt({
       prompt,
       context,
