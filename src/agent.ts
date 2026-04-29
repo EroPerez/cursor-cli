@@ -1,14 +1,15 @@
 import { execFileSync } from "node:child_process"
-
 import {
   Agent,
   Cursor,
+  type McpServerConfig,
   type ModelSelection,
   type Run,
   type SDKAgent,
   type SDKMessage,
   type SDKModel,
 } from "@cursor/sdk"
+import type { McpServers } from "./mcp.js"
 
 export type AgentEvent =
   | { type: "assistant_delta"; text: string }
@@ -59,6 +60,7 @@ type CodingAgentSessionOptions = {
   model: ModelSelection
   force: boolean
   executionMode?: ExecutionMode
+  mcpServers?: McpServers
 }
 
 type SendPromptOptions = {
@@ -89,6 +91,7 @@ export class CodingAgentSession {
   private readonly force: boolean
   private mode: ExecutionMode
   private modelSelection: ModelSelection
+  private mcpServers: McpServers
 
   constructor(options: CodingAgentSessionOptions) {
     this.apiKey = options.apiKey
@@ -96,8 +99,20 @@ export class CodingAgentSession {
     this.force = options.force
     this.mode = options.executionMode ?? "local"
     this.modelSelection = options.model
-    this.agent = this.createAgent() as unknown as SDKAgent
+    this.mcpServers = options.mcpServers ?? {}
+    // Agent will be initialized async via ensureAgentReady()
+    this.agent = null as any
     this.agentKey = this.currentAgentKey()
+  }
+
+  async ensureAgentReady() {
+    if (!this.agent) {
+      this.agent = await this.createAgent()
+    }
+  }
+
+  setMcpServers(servers: McpServers) {
+    this.mcpServers = servers
   }
 
   get model() {
@@ -194,32 +209,35 @@ export class CodingAgentSession {
     }
   }
 
-  private createAgent() {
+  private async createAgent(): Promise<SDKAgent> {
+    const mcpServers = Object.keys(this.mcpServers).length > 0 ? this.mcpServers : undefined
     const options = {
       apiKey: this.apiKey,
       name: "Lightweight coding agent",
       model: this.modelSelection,
+      mcpServers,
     }
     if (this.mode === "cloud") {
       const repository = detectCloudRepository(this.cwd)
       this.cloudRepository = repository
-      return Agent.create({
+      return (await Agent.create({
         ...options,
         cloud: {
           repos: [repository],
         },
-      })
+      })) as SDKAgent
     }
     this.cloudRepository = null
-    return Agent.create({
+    return (await Agent.create({
       ...options,
       local: {
         cwd: this.cwd,
       },
-    })
+    })) as SDKAgent
   }
 
   private async ensureAgentFresh() {
+    await this.ensureAgentReady()
     if (this.agentKey !== this.currentAgentKey()) {
       await this.replaceAgent()
     }
@@ -227,9 +245,11 @@ export class CodingAgentSession {
 
   private async replaceAgent() {
     const previousAgent = this.agent
-    this.agent = this.createAgent() as unknown as SDKAgent
+    this.agent = await this.createAgent()
     this.agentKey = this.currentAgentKey()
-    await previousAgent[Symbol.asyncDispose]()
+    if (previousAgent?.[Symbol.asyncDispose]) {
+      await previousAgent[Symbol.asyncDispose]()
+    }
   }
 
   private currentAgentKey() {

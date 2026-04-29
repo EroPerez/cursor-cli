@@ -15,13 +15,23 @@ import { printBanner } from "./banner.js"
 import { getGitContextString } from "./git-context.js"
 import { loadSessionById } from "./history.js"
 import { runLogin } from "./login.js"
+import { runDemoMode } from "./demo.js"
+import {
+  addMcpServer,
+  formatMcpServerList,
+  loadMcpServers,
+  parseMcpAddArgs,
+  removeMcpServer,
+} from "./mcp.js"
 import { App } from "./tui/App.js"
 
 type CliOptions = {
   cwd: string
+  demo: boolean
   force: boolean
   help: boolean
   login: boolean
+  mcp: string[]
   model: string
   prompt: string
   verbose: boolean
@@ -40,8 +50,18 @@ async function main() {
     return
   }
 
+  if (options.demo) {
+    await runDemoMode(options.cwd, options.prompt)
+    return
+  }
+
   if (options.login) {
     await runLogin()
+    return
+  }
+
+  if (options.mcp) {
+    runMcpCommand(options.mcp)
     return
   }
 
@@ -120,9 +140,11 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
   const DEFAULT_MODEL = process.env.CURSOR_MODEL ?? configModel ?? "composer-2"
   const promptParts: string[] = []
   let cwd = process.cwd()
+  let demo = false
   let force = false
   let help = false
   let login = false
+  let mcp: string[] = []
   let model = DEFAULT_MODEL
   let verbose = false
   let json = false
@@ -137,7 +159,9 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
       break
     }
     if (arg === "--help" || arg === "-h") { help = true; continue }
+    if (arg === "--demo") { demo = true; continue }
     if (arg === "login") { login = true; continue }
+    if (arg === "mcp") { mcp = argv.slice(index + 1); break }
     if (arg === "--force") { force = true; continue }
     if (arg === "--verbose" || arg === "-v") { verbose = true; continue }
     if (arg === "--json") { json = true; continue }
@@ -180,9 +204,11 @@ function parseArgs(argv: string[], configModel: string | undefined): CliOptions 
 
   return {
     cwd: path.resolve(cwd),
+    demo,
     force,
     help,
     login,
+    mcp,
     model,
     prompt: promptParts.join(" ").trim(),
     verbose,
@@ -231,6 +257,7 @@ async function runPlainPrompt(
   }
 
   try {
+    await session.ensureAgentReady()
     await session.sendPrompt({
       prompt,
       context,
@@ -351,14 +378,19 @@ function printHelp() {
   console.log(`Cursor Agent CLI — powered by @cursor/sdk
 
 Usage:
-  cursor-agent login               Authenticate via browser and save API key.
-  cursor-agent [options] "task"    Run a one-shot prompt.
-  cursor-agent [options]           Start the interactive TUI.
+  cursor-cli login                      Authenticate via browser and save API key.
+  cursor-cli mcp list                   List configured MCP servers.
+  cursor-cli mcp add <name> --command <cmd> [args...]
+  cursor-cli mcp add <name> --url <url> [--type http|sse]
+  cursor-cli mcp remove <name>          Remove an MCP server.
+  cursor-cli [options] "task"           Run a one-shot prompt.
+  cursor-cli [options]                  Start the interactive TUI.
 
 Options:
   -C, --cwd <path>       Workspace directory. Defaults to current directory.
   -m, --model <id>       Model id. Defaults to CURSOR_MODEL env or composer-2.
   --theme <name>         Color theme: ${THEME_NAMES.join(", ")}.
+  --demo                 Demo mode (simulated agent, no API key needed).
   --verbose, -v          Show tool call details and thinking output.
   --json                 Emit newline-delimited JSON events (pipe-friendly).
   --no-git               Disable automatic git context injection.
@@ -375,6 +407,10 @@ Interactive slash commands:
   /local                 Switch to local workspace execution.
   /cloud                 Switch to Cursor cloud execution.
   /model                 Open model picker.
+  /models                List all available models.
+  /mcp [list]            List configured MCP servers.
+  /mcp add <name> ...    Add an MCP server.
+  /mcp remove <name>     Remove an MCP server.
   /theme [name]          Switch color theme or open theme picker.
   /reset                 Fresh agent, same session.
   /clear                 Clear the transcript.
@@ -388,12 +424,49 @@ Interactive slash commands:
   /exit, /quit           Exit the TUI.
 
 Examples:
+  cursor-agent --demo "How does this work?"  # Demo mode, no API key
   cursor-agent "Explain the auth flow"
   cursor-agent --cwd ../my-app "Add tests for the parser"
   cursor-agent --verbose --json "Refactor UserService"
   cursor-agent
   printf "Review recent changes" | cursor-agent
   `)
+}
+
+function runMcpCommand(args: string[]) {
+  const sub = args[0]
+
+  if (!sub || sub === "list") {
+    console.log(formatMcpServerList(loadMcpServers()))
+    return
+  }
+
+  if (sub === "add") {
+    const result = parseMcpAddArgs(args.slice(1))
+    if (typeof result === "string") {
+      console.error(result)
+      process.exitCode = 1
+      return
+    }
+    addMcpServer(result.name, result.config)
+    console.log(`Added MCP server "${result.name}".`)
+    return
+  }
+
+  if (sub === "remove") {
+    const name = args[1]
+    if (!name) {
+      console.error("Usage: cursor-cli mcp remove <name>")
+      process.exitCode = 1
+      return
+    }
+    const removed = removeMcpServer(name)
+    console.log(removed ? `Removed MCP server "${name}".` : `No server named "${name}".`)
+    return
+  }
+
+  console.error(`Unknown mcp subcommand "${sub}". Use: list | add | remove`)
+  process.exitCode = 1
 }
 
 main().catch((error) => {

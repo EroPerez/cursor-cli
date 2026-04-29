@@ -40,6 +40,13 @@ import {
   type SessionMessage,
   type SessionRecord,
 } from "../history.js"
+import {
+  addMcpServer,
+  formatMcpServerList,
+  loadMcpServers,
+  parseMcpAddArgs,
+  removeMcpServer,
+} from "../mcp.js"
 import { webSearch, formatSearchResults } from "../search.js"
 import { getTheme, type ThemeColors } from "../themes.js"
 import type { ModelSelection } from "@cursor/sdk"
@@ -153,11 +160,15 @@ export function App({
       cwd,
       force,
       model: initialModel,
+      mcpServers: loadMcpServers(),
     })
   }
 
   useEffect(() => {
     const session = sessionRef.current
+    if (session) {
+      void session.ensureAgentReady()
+    }
     return () => {
       void session?.dispose()
     }
@@ -392,6 +403,41 @@ export function App({
         } finally {
           setBusy(false)
         }
+        break
+      }
+
+      case "/mcp": {
+        const mcpArg = arg.trim()
+        const parts = mcpArg.split(/\s+/)
+        const sub = parts[0]
+
+        if (!sub || sub === "list") {
+          addEntry("meta", "mcp", formatMcpServerList(loadMcpServers()))
+          break
+        }
+
+        if (sub === "add") {
+          const result = parseMcpAddArgs(parts.slice(1))
+          if (typeof result === "string") {
+            addEntry("error", "mcp", result)
+            break
+          }
+          addMcpServer(result.name, result.config)
+          sessionRef.current?.setMcpServers(loadMcpServers())
+          addEntry("status", "mcp", `Added MCP server "${result.name}".`)
+          break
+        }
+
+        if (sub === "remove") {
+          const name = parts[1]
+          if (!name) { addEntry("error", "mcp", "Usage: /mcp remove <name>"); break }
+          const removed = removeMcpServer(name)
+          sessionRef.current?.setMcpServers(loadMcpServers())
+          addEntry("status", "mcp", removed ? `Removed MCP server "${name}".` : `No server named "${name}".`)
+          break
+        }
+
+        addEntry("error", "mcp", `Unknown subcommand "${sub}". Use: list | add | remove`)
         break
       }
 

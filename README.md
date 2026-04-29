@@ -72,6 +72,9 @@ bun run dev /config apiKey crsr_...
 ### Quick Start
 
 ```bash
+# Test without API key (demo mode)
+cursor-cli --demo "How does this work?"
+
 # Authenticate first (one-time)
 cursor-cli login
 
@@ -79,13 +82,13 @@ cursor-cli login
 cursor-cli .
 
 # One-shot prompt (current directory)
-./cursor-cli "Explain the auth flow"
+cursor-cli "Explain the auth flow"
 
 # TUI in a different workspace
-./cursor-cli /path/to/project
+cursor-cli /path/to/project
 
 # One-shot with a specific workspace
-./cursor-cli /path/to/project "Add tests for the parser"
+cursor-cli /path/to/project "Add tests for the parser"
 ```
 
 ### Development Mode
@@ -144,7 +147,7 @@ cursor-cli . --resume abc12345
 
 | Variable | Description |
 |----------|-------------|
-| `CURSOR_API_KEY` | Required. Your Cursor API key (`crsr_...`) |
+| `CURSOR_API_KEY` | API key (`crsr_...`). Optional if saved via `cursor-cli login` |
 | `CURSOR_MODEL` | Optional. Default model id override |
 
 ## Interactive TUI
@@ -164,6 +167,10 @@ pnpm dev
 | `/cloud` | Switch to Cursor cloud execution |
 | `/model` | Open interactive model picker |
 | `/models` | List all available Cursor models |
+| `/mcp [list]` | List configured MCP servers |
+| `/mcp add <name> --command <cmd> [args...]` | Add a stdio MCP server |
+| `/mcp add <name> --url <url> [--type http\|sse]` | Add an HTTP/SSE MCP server |
+| `/mcp remove <name>` | Remove an MCP server |
 | `/theme [name]` | Switch color theme or open picker |
 | `/reset` | Start a fresh agent, keep session |
 | `/clear` | Clear the transcript |
@@ -186,6 +193,17 @@ pnpm dev
 | `↑` / `↓` | Scroll transcript / navigate selector |
 | `PgUp` / `PgDn` | Scroll transcript by page |
 | `Home` / `End` | Jump to top / bottom of transcript |
+
+## Demo Mode
+
+Test cursor-cli without an API key:
+
+```bash
+cursor-cli --demo "Explain what MCP servers are"
+cursor-cli --demo  # Interactive mode with simulated agent
+```
+
+Demo mode streams simulated agent responses with thinking, tool calls, and realistic typing delays — perfect for testing the UI and understanding agent behavior without a real API key.
 
 ## Configuration
 
@@ -302,6 +320,56 @@ Summarize a long conversation to recover context tokens:
 
 The agent summarizes the exchange and replaces the transcript with a condensed version.
 
+## MCP Servers
+
+cursor-cli supports the [Model Context Protocol](https://modelcontextprotocol.io) — connect any MCP-compatible tool server to extend what the agent can do.
+
+Servers are stored in `~/.cursor-cli/mcp.json` and loaded automatically on session start.
+
+### Add a stdio server (local process)
+
+```bash
+# npx-based server
+cursor-cli mcp add filesystem --command npx -- -y @modelcontextprotocol/server-filesystem /home/user
+
+# Custom binary
+cursor-cli mcp add mytool --command /usr/local/bin/my-mcp-server --arg1 --arg2
+```
+
+### Add an HTTP / SSE server (remote)
+
+```bash
+cursor-cli mcp add myapi --url http://localhost:3000/mcp
+cursor-cli mcp add remote --url https://mcp.example.com/sse --type sse
+```
+
+### Manage servers
+
+```bash
+cursor-cli mcp list          # list all configured servers
+cursor-cli mcp remove myapi  # remove a server
+```
+
+Or manage inline from the TUI with `/mcp list`, `/mcp add`, `/mcp remove`.
+
+### mcp.json format
+
+```json
+{
+  "servers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user"]
+    },
+    "myapi": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
 ## Project Structure
 
 ```
@@ -311,6 +379,7 @@ src/
 ├── banner.ts         # ASCII art banner for interactive mode
 ├── commands.ts       # Slash command registry and parsing
 ├── login.ts          # Web login flow (browser + API key prompt)
+├── mcp.ts            # MCP server config management (~/.cursor-cli/mcp.json)
 ├── config.ts         # Persistent configuration (~/.cursor-cli/config.json)
 ├── history.ts        # Session storage, resume, markdown export
 ├── search.ts         # DuckDuckGo web search integration
