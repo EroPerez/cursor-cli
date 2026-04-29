@@ -1,0 +1,18 @@
+#!/bin/bash
+# cursor-cli - Run the Cursor Agent CLI
+# Usage: ./cursor-cli [options] [prompt]
+#        ./cursor-cli . - Open TUI in current directory
+#        ./cursor-cli ../myapp "your task"
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Handle special case: cursor-cli .
+if [[ "$1" == "." ]]; then
+  shift
+  exec bun "$SCRIPT_DIR/src/index.ts" --cwd "$(pwd)" "$@"
+fi
+
+# Normal usage
+exec bun "$SCRIPT_DIR/src/index.ts" "$@"
