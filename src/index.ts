@@ -60,7 +60,7 @@ async function main() {
     return
   }
 
-  if (options.mcp) {
+  if (options.mcp.length > 0) {
     runMcpCommand(options.mcp)
     return
   }
