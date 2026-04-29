@@ -378,13 +378,13 @@ function printHelp() {
   console.log(`Cursor Agent CLI — powered by @cursor/sdk
 
 Usage:
-  cursor-agent login                      Authenticate via browser and save API key.
-  cursor-agent mcp list                   List configured MCP servers.
-  cursor-agent mcp add <name> --command <cmd> [args...]
-  cursor-agent mcp add <name> --url <url> [--type http|sse]
-  cursor-agent mcp remove <name>          Remove an MCP server.
-  cursor-agent [options] "task"           Run a one-shot prompt.
-  cursor-agent [options]                  Start the interactive TUI.
+  cursor-cli login                      Authenticate via browser and save API key.
+  cursor-cli mcp list                   List configured MCP servers.
+  cursor-cli mcp add <name> --command <cmd> [args...]
+  cursor-cli mcp add <name> --url <url> [--type http|sse]
+  cursor-cli mcp remove <name>          Remove an MCP server.
+  cursor-cli [options] "task"           Run a one-shot prompt.
+  cursor-cli [options]                  Start the interactive TUI.
 
 Options:
   -C, --cwd <path>       Workspace directory. Defaults to current directory.
