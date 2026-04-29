@@ -96,7 +96,7 @@ export class CodingAgentSession {
     this.force = options.force
     this.mode = options.executionMode ?? "local"
     this.modelSelection = options.model
-    this.agent = this.createAgent()
+    this.agent = this.createAgent() as unknown as SDKAgent
     this.agentKey = this.currentAgentKey()
   }
 
@@ -227,7 +227,7 @@ export class CodingAgentSession {
 
   private async replaceAgent() {
     const previousAgent = this.agent
-    this.agent = this.createAgent()
+    this.agent = this.createAgent() as unknown as SDKAgent
     this.agentKey = this.currentAgentKey()
     await previousAgent[Symbol.asyncDispose]()
   }
