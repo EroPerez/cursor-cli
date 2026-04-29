@@ -9,10 +9,10 @@ COPY package.json ./
 # Use bun install directly — no npm or pnpm needed
 RUN bun install
 
-# Copy source and build using bun's bundled tsc
+# Copy source and build using bunx (bun's npx equivalent)
 COPY tsconfig.json ./
 COPY src ./src
-RUN bun run --bun ./node_modules/.bin/tsc
+RUN bunx tsc
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM oven/bun:1.3-alpine
