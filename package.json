@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "bun src/index.ts",
-    "build": "tsc",
+    "build": "bun run --bun ./node_modules/.bin/tsc",
     "start": "bun dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bun run --bun ./node_modules/.bin/tsc --noEmit"
   },
   "dependencies": {
     "@cursor/sdk": "^1.0.7",
