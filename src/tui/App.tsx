@@ -1015,7 +1015,7 @@ export function App({
             value={input}
             onInput={(value) => {
               setInput(value)
-              if (!busy && value.startsWith("/")) {
+              if (!busy && value.startsWith("/") && !value.includes(" ")) {
                 setMode("command")
               }
             }}
