@@ -383,10 +383,13 @@ export function App({
     setInput("")
 
     switch (command) {
-      case "/help":
-        setInput("/")
-        setMode("command")
+      case "/help": {
+        const lines = slashCommands
+          .map((c) => `${c.name.padEnd(12)} ${c.summary}`)
+          .join("\n")
+        addEntry("meta", "help", lines)
         break
+      }
 
       case "/model":
         await openModelPicker()
