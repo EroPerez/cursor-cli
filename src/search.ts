@@ -25,9 +25,17 @@ export async function webSearch(query: string): Promise<SearchResponse> {
 
   const data = (await response.json()) as DdgResponse
 
-  const results: SearchResult[] = (data.RelatedTopics ?? [])
-    .filter((t): t is DdgTopic => "Text" in t && "FirstURL" in t)
-    .slice(0, 6)
+  const flatTopics: DdgTopic[] = []
+  for (const item of data.RelatedTopics ?? []) {
+    if ("Text" in item && "FirstURL" in item) {
+      flatTopics.push(item)
+    } else if ("Topics" in item) {
+      flatTopics.push(...item.Topics)
+    }
+  }
+
+  const results: SearchResult[] = flatTopics
+    .slice(0, 8)
     .map((t) => ({
       title: t.Text.split(" - ")[0]?.trim() ?? t.Text,
       url: t.FirstURL,
