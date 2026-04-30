@@ -233,6 +233,28 @@ export function App({
       return
     }
 
+    if (mode === "command") {
+      if (isSearchInput(character)) {
+        setInput((v) => `${v}${character}`)
+        return
+      }
+      if (key.name === "backspace" || key.name === "delete") {
+        if (input.length <= 1) {
+          setInput("")
+          setMode("input")
+        } else {
+          setInput((v) => v.slice(0, -1))
+        }
+        return
+      }
+    }
+
+    if (mode === "history") {
+      if (isSearchInput(character)) setModelSearch((v) => `${v}${character}`)
+      else if (key.name === "backspace" || key.name === "delete") setModelSearch((v) => v.slice(0, -1))
+      return
+    }
+
     if (mode === "input") {
       const pageSize = Math.max(1, transcriptViewportRows - 1)
       const maxScrollOffset = Math.max(0, transcriptLines.length - transcriptViewportRows)
@@ -256,7 +278,7 @@ export function App({
   const commandSelectRows = Math.min(6, Math.max(3, rows - 10))
   const modelSelectRows = Math.min(8, Math.max(3, rows - 10))
   const historySelectRows = Math.min(8, Math.max(3, rows - 10))
-  const commandPanelRows = 2 + commandSelectRows
+  const commandPanelRows = 3 + commandSelectRows
   const modelPanelRows = 3 + modelSelectRows
   const historyPanelRows = 3 + historySelectRows
 
@@ -913,7 +935,8 @@ export function App({
           <text attributes={TextAttributes.BOLD} fg={theme.heading}>
             Commands
           </text>
-          <text fg={theme.dim}>Use arrows and Enter, or Escape to cancel.</text>
+          <text fg={theme.dim}>Type to search - Enter to run - Escape to cancel</text>
+          <text fg={theme.dim}>Search: {input.slice(1) || "all commands"}</text>
           <select
             focused={mode === "command"}
             height={commandSelectRows}
