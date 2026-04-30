@@ -24,6 +24,7 @@ import {
   removeMcpServer,
 } from "./mcp.js"
 import { App } from "./tui/App.js"
+import { webSearch, formatSearchResults } from "./search.js"
 
 type CliOptions = {
   cwd: string
@@ -79,6 +80,11 @@ async function main() {
   const useGit = !options.noGit && config.autoGitContext
 
   if (options.prompt) {
+    const webMatch = options.prompt.match(/^\/web\s+(.+)/)
+    if (webMatch) {
+      await runWebSearch(webMatch[1]!.trim())
+      return
+    }
     const gitContext = useGit ? getGitContextString(options.cwd) : undefined
     await runPlainPrompt(apiKey, options, options.prompt, { gitContext }, verbose, options.json)
     return
@@ -88,6 +94,11 @@ async function main() {
     const prompt = (await readStdin()).trim()
     if (!prompt) {
       throw new Error("No prompt provided on stdin.")
+    }
+    const webMatch = prompt.match(/^\/web\s+(.+)/)
+    if (webMatch) {
+      await runWebSearch(webMatch[1]!.trim())
+      return
     }
     const gitContext = useGit ? getGitContextString(options.cwd) : undefined
     await runPlainPrompt(apiKey, options, prompt, { gitContext }, verbose, options.json)
@@ -274,6 +285,17 @@ async function runPlainPrompt(
     })
   } finally {
     await session.dispose()
+  }
+}
+
+async function runWebSearch(query: string) {
+  try {
+    const result = await webSearch(query)
+    process.stdout.write(formatSearchResults(result) + "\n")
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    process.stderr.write(`Search failed: ${message}\n`)
+    process.exitCode = 1
   }
 }
 
