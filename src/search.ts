@@ -60,10 +60,37 @@ export async function webSearch(query: string): Promise<SearchResponse> {
     throw new Error(`Search request failed: HTTP ${htmlResponse.status}`)
   }
 
-  const html = await htmlResponse.text()
+  const html = await readCapped(htmlResponse, 65_536)
   const results = parseDdgHtml(html).slice(0, 8)
 
   return { query, abstract: "", results }
+}
+
+async function readCapped(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader()
+  if (!reader) return response.text()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done || !value) break
+      chunks.push(value)
+      total += value.byteLength
+      if (total >= maxBytes) break
+    }
+  } finally {
+    reader.cancel().catch(() => {})
+  }
+  const merged = new Uint8Array(Math.min(total, maxBytes))
+  let offset = 0
+  for (const chunk of chunks) {
+    const slice = chunk.slice(0, maxBytes - offset)
+    merged.set(slice, offset)
+    offset += slice.byteLength
+    if (offset >= maxBytes) break
+  }
+  return new TextDecoder().decode(merged)
 }
 
 function parseDdgHtml(html: string): SearchResult[] {
